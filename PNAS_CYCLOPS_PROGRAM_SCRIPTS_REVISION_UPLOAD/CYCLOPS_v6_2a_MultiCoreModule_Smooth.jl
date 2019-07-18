@@ -1,9 +1,9 @@
-module CYCLOPS_2a_MultiCoreModule_Smooth
+module CYCLOPS_v6_2a_MultiCoreModule_Smooth
 
 using StatsBase
 using MultivariateStats
-using CYCLOPS_2a_AutoEncoderModule
-using CYCLOPS_2a_PreNPostprocessModule
+using CYCLOPS_v6_2a_AutoEncoderModule_multi
+using CYCLOPS_v6_2a_PreNPostprocessModule
 
 export backgroundmetrics_global_eigen
 export multicore_backgroundmetrics_global_eigen
@@ -46,7 +46,7 @@ end
 
 ###########################################################################
 function smoothness_measures(l_seeddata::Array{Float64,2},l_eigendata::Array{Float64,2},estimated_phaselist)
-	estimated_phaselist1s=mod(estimated_phaselist,2*pi)
+	estimated_phaselist1s=mod.(estimated_phaselist,2*pi)
 	use_order_c=sortperm(estimated_phaselist1s)
 	use_order_l=sortperm(vec(l_eigendata[1,:]))
 
@@ -62,12 +62,12 @@ function smoothness_measures(l_seeddata::Array{Float64,2},l_eigendata::Array{Flo
 
 	gdiffs				=circ_diff(circ_seeddata)
 	gdiffs2				=gdiffs .* gdiffs
-	gdiffsm				=sqrt(sum(gdiffs2,1))
+	gdiffsm				=sqrt.(sum(gdiffs2,1))
 	num					=sum(gdiffsm)/nsamp
 
 	gdiffs				=diff(lin_seeddata,2)
 	gdiffs2				=gdiffs .* gdiffs
-	gdiffsm				=sqrt(sum(gdiffs2,1))
+	gdiffsm				=sqrt.(sum(gdiffs2,1))
 	denom				=sum(gdiffsm)/(nsamp-1)
 	measure_raw			=num/denom
 	
@@ -85,12 +85,12 @@ function smoothness_measures(l_seeddata::Array{Float64,2},l_eigendata::Array{Flo
 	######################################################
 	gdiffs				=circ_diff(circ_eigendata)
 	gdiffs2				=gdiffs .* gdiffs
-	gdiffsm				=sqrt(sum(gdiffs2,1))
+	gdiffsm				=sqrt.(sum(gdiffs2,1))
 	num					=sum(gdiffsm)/nsamp
 
 	gdiffs				=diff(lin_eigendata,2)
 	gdiffs2				=gdiffs .* gdiffs
-	gdiffsm				=sqrt(sum(gdiffs2,1))
+	gdiffsm				=sqrt.(sum(gdiffs2,1))
 	denom				=sum(gdiffsm)/(nsamp-1)
 	measure_eigen		=num/denom
 	
@@ -138,11 +138,11 @@ end
 ###########################################################################
 function multicore_backgroundmetrics_global_eigen(seed_ldata::Array{Float64,2},ESize::Integer,N_best::Integer,N_trials::Integer)
 
-	a1=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,int(N_trials/5));
-	a2=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,int(N_trials/5));
-	a3=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,int(N_trials/5));
-	a4=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,int(N_trials/5));
-	a5=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,int(N_trials/5));
+	a1=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,Int(N_trials/5));
+	a2=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,Int(N_trials/5));
+	a3=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,Int(N_trials/5));
+	a4=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,Int(N_trials/5));
+	a5=@spawn backgroundmetrics_global_eigen(seed_ldata,ESize,N_best,Int(N_trials/5));
 
 
 	global1=fetch(a1);

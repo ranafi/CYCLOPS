@@ -1,28 +1,39 @@
 addprocs(5)
-LOAD_PATH
-LOAD_PATH=LOAD_PATH[1:2]
-basedir=homedir();
-netdir=string(basedir,"/Google Drive/PNAS_CYCLOPS_SCRIPTS/PNAS_CYCLOPS_PROGRAM_SCRIPTS_REVISION_UPLOAD");
-cd(netdir);
-push!(LOAD_PATH,netdir)
+################
+#My local machine has 6 processors
+#CYCLOPS is written to use them
+#################
+@everywhere basedir=homedir();
+@everywhere netdir=string(basedir,"/Desktop/CYCLOPS_UPDATE_SHARE");
+@everywhere cd(netdir);
+
 
 using StatsBase
 using MultivariateStats
 using Distributions
+
+@everywhere include("CYCLOPS_v6_2a_AutoEncoderModule_multi.jl")
+@everywhere include("CYCLOPS_v6_2a_seed.jl")
+@everywhere include("CYCLOPS_v6_2a_PreNPostprocessModule.jl")
+@everywhere include("CYCLOPS_v6_2a_CircularStats_U.jl")
+@everywhere include("CYCLOPS_v6_2a_MultiCoreModule_Smooth.jl")
+
+
+using CYCLOPS_v6_2a_AutoEncoderModule_multi
+using CYCLOPS_v6_2a_Seed
+using CYCLOPS_v6_2a_PreNPostprocessModule
+using CYCLOPS_v6_2a_CircularStats_U
+using CYCLOPS_v6_2a_MultiCoreModule_Smooth
+
+ 
 using PyPlot
+#indirlaval=string(basedir,"/Documents/LungWork_March2015/LAVAL/UsableData");
+#indirgrng=string(basedir,"/Documents/LungWork_March2015/GRNG/UsableData");
+#homologuedir=string(basedir,"/Google Drive/BHTC_Homologues")
 
-using CYCLOPS_2a_AutoEncoderModule
-using CYCLOPS_2a_PreNPostprocessModule
-using CYCLOPS_2a_MCA
-using CYCLOPS_2a_MultiCoreModule_Smooth
-using CYCLOPS_2a_Seed
-using CYCLOPS_2a_CircularStats_U
-
-
-indirlaval=string(basedir,"/Documents/LungWork_March2015/LAVAL/UsableData");
-indirgrng=string(basedir,"/Documents/LungWork_March2015/GRNG/UsableData");
-
-homologuedir=string(basedir,"/Google Drive/BHTC_Homologues")
+indirlaval=netdir;
+indirgrng=netdir;
+homologuedir=netdir;
 
 ############################################################
 cd(indirlaval);
@@ -38,18 +49,18 @@ homologue_symbol_list=seed_homologues[2:end,2];
 ############################################################
 Frac_Var=0.85 # Set Number of Dimensions of SVD to maintain this fraction of variance
 DFrac_Var=0.03 # Set Number of Dimensions of SVD to so that incremetal fraction of variance of var is at least this much
-N_trials =40  # Number of random initial conditions to try for each optimization
+N_trials =20  # Number of random initial conditions to try for each optimization
 MaxSeeds = 10000
 
-total_background_num=40; # Number of background runs for global background refrence statistics
+total_background_num=20; # Number of background runs for global background refrence statistics
 n_cores=5; # Number of machine cores
 ############################################################
 
 alldata_data_l=fullnonseed_data_laval[2:end , 4:end];
-alldata_data_l=float64(alldata_data_l);
+alldata_data_l=Array{Float64}(alldata_data_l); 
 
 alldata_data_g=fullnonseed_data_grng[2:end , 4:end];
-alldata_data_g=float64(alldata_data_g);
+alldata_data_g=Array{Float64}(alldata_data_g); 
 
 alldata_symbols_g=fullnonseed_data_grng[2:end , 2];
 nprobes=size(alldata_data_l)[1]
@@ -69,11 +80,14 @@ seed_data_dispersion_g           =   dispersion!(seed_data_g)
 outs_g, norm_seed_data_g				 =	 GetEigenGenes(seed_data_dispersion_g,Frac_Var,DFrac_Var,30)
 
 #################
-a_g =@spawn CYCLOPS_Order(outs_g,norm_seed_data_g,N_trials);  
-a_l =@spawn CYCLOPS_Order(outs_l,norm_seed_data_l,N_trials);
+a_g =CYCLOPS_Order_multicore(outs_g,norm_seed_data_g,N_trials);  
+a_l =CYCLOPS_Order_multicore(outs_l,norm_seed_data_l,N_trials);
 
-estimated_phaselist_g,bestnet_g,global_var_metrics_g=fetch(a_g);
-estimated_phaselist_l,bestnet_l,global_var_metrics_l=fetch(a_l);
+#a_g =CYCLOPS_Order(outs_g,norm_seed_data_g,N_trials);  
+#a_l =CYCLOPS_Order(outs_l,norm_seed_data_l,N_trials);
+
+estimated_phaselist_g,bestnet_g,global_var_metrics_g=a_g;
+estimated_phaselist_l,bestnet_l,global_var_metrics_l=a_l;
 
 
 global_smooth_metrics_g            = smoothness_measures(seed_data_dispersion_g,norm_seed_data_g,estimated_phaselist_g)
@@ -92,24 +106,15 @@ cd(outdir);
 
 ############################################################
 function Filter_Cosinor_Output(cosdata::Array{Any,2},pval,rsq,ptt) 
-    significant_data=cosdata[[true,cosdata[2:end,5].<pval],:];
-    phys_sig_data=significant_data[[true,significant_data[2:end,11].> ptt],:];
-    strong_data=phys_sig_data[[true,phys_sig_data[2:end,10].> rsq],:];
+    significant_data=cosdata[append!([1],1 + findin(cosdata[2:end,5] .< pval,true)),:];
+    phys_sig_data=significant_data[append!([1],1 + findin(significant_data[2:end,11] .> ptt,true)),:];
+    strong_data=phys_sig_data[append!([1],1 + findin(phys_sig_data[2:end,10].> rsq,true)),:];
     strong_data
 end
 ############################################################
 
-############################################################
-function Circular_Mean(phases::Array{Float64,1})
-  sinterm=sum(sin(phases))
-  costerm=sum(cos(phases))
-  atan2(sinterm,costerm)
-end 
-
-############################################################
-
-estimated_phaselist_g=mod(estimated_phaselist_g,2*pi)
-estimated_phaselist_l=mod(estimated_phaselist_l,2*pi)
+estimated_phaselist_g=mod.(estimated_phaselist_g,2*pi)
+estimated_phaselist_l=mod.(estimated_phaselist_l,2*pi)
 
 cosinor_grng=Compile_MultiCore_Cosinor_Statistics(fullnonseed_data_grng,estimated_phaselist_g,4,24)
 cosinor_laval=Compile_MultiCore_Cosinor_Statistics(fullnonseed_data_laval,estimated_phaselist_l,4,24)
@@ -121,8 +126,8 @@ common_g_l=intersect(sig_grng[2:end,1],sig_laval[2:end,1])
 rows_laval_g_l=findin(sig_laval[:,1],common_g_l)
 rows_grng_g_l=findin(sig_grng[:,1],common_g_l)
 
-use_grng_g_l=mod(sig_grng[rows_grng_g_l,6],2*pi)
-use_laval_g_l=mod(sig_laval[rows_laval_g_l,6],2*pi)
+use_grng_g_l=mod.(sig_grng[rows_grng_g_l,6],2*pi)
+use_laval_g_l=mod.(sig_laval[rows_laval_g_l,6],2*pi)
 
 
 use_laval_adj1,estimated_phaselist_l_adj1=best_shift_cos2(use_laval_g_l,use_grng_g_l,estimated_phaselist_l,"radians")
@@ -135,8 +140,8 @@ cosinor_laval=Compile_MultiCore_Cosinor_Statistics(fullnonseed_data_laval,estima
 #####################################
 eboxgenes=["DBP","HLF","TEF"]
 
-eboxphases_laval=cosinor_laval[[findin(cosinor_laval[:,2],eboxgenes)],:]
-eboxphases_grng=cosinor_grng[[findin(cosinor_grng[:,2],eboxgenes)],:]
+eboxphases_laval=cosinor_laval[findin(cosinor_laval[:,2],eboxgenes),:]
+eboxphases_grng=cosinor_grng[findin(cosinor_grng[:,2],eboxgenes),:]
 
 laval_criteria=((eboxphases_laval[:,4].<.05) & ( eboxphases_laval[:,11].>1.25) & ( eboxphases_laval[:,9].>100))
 grng_criteria=((eboxphases_grng[:,4].<.05) & ( eboxphases_grng[:,11].>1.25) & ( eboxphases_laval[:,9].>100))
@@ -144,15 +149,14 @@ grng_criteria=((eboxphases_grng[:,4].<.05) & ( eboxphases_grng[:,11].>1.25) & ( 
 eboxphases_laval=eboxphases_laval[findin(laval_criteria,true),:]
 eboxphases_grng=eboxphases_grng[findin(grng_criteria,true),:]
 
-eboxphases_laval=float(eboxphases_laval[:,6])
-eboxphases_grng=float(eboxphases_grng[:,6])
+eboxphases_laval=Array{Float64}(eboxphases_laval[:,6])
+eboxphases_grng=Array{Float64}(eboxphases_grng[:,6])
 
-eboxphases=float([eboxphases_laval,eboxphases_grng])
-
+eboxphases=append!(eboxphases_laval,eboxphases_grng)
 eboxphase=Circular_Mean(eboxphases)
 
-estimated_phaselist_g_adj_final=mod(estimated_phaselist_g .- eboxphase+(pi),2*pi)  ##ebox genes in mouse lung peak on average CT 11.5 
-estimated_phaselist_l_adj_final=mod(estimated_phaselist_l_adj1 .- eboxphase+(pi),2*pi)  ##ebox genes in mouse lung peak on average CT 11.5 
+estimated_phaselist_g_adj_final=mod.(estimated_phaselist_g .- eboxphase+(pi),2*pi)  ##ebox genes in mouse lung peak on average CT 11.5 
+estimated_phaselist_l_adj_final=mod.(estimated_phaselist_l_adj1 .- eboxphase+(pi),2*pi)  ##ebox genes in mouse lung peak on average CT 11.5 
 
 
 
@@ -176,10 +180,10 @@ nsig_laval=Filter_Cosinor_Output(cosinor_laval,.05,0,1.66)
 common_g_l=intersect(nsig_grng[2:end,1],nsig_laval[2:end,1])
 
 cd(outdir);
-writecsv("Laval_Sample_Phaselist.csv",estimated_phaselist_l_adj_final);
-writecsv("GRNG_Sample_Phaselist.csv",estimated_phaselist_g_adj_final);
-writecsv("Laval_Cosinor_Output.csv",cosinor_laval);
-writecsv("GRNG_Cosinor_Output.csv",cosinor_grng);
+#writecsv("Laval_Sample_Phaselist.csv",estimated_phaselist_l_adj_final);
+#writecsv("GRNG_Sample_Phaselist.csv",estimated_phaselist_g_adj_final);
+#writecsv("Laval_Cosinor_Output.csv",cosinor_laval);
+#writecsv("GRNG_Cosinor_Output.csv",cosinor_grng);
 
 ############################################################
 sig_laval=Filter_Cosinor_Output(cosinor_laval,.05,0,1.666)
@@ -205,21 +209,6 @@ xlabs=[0, "","π","","2π"]
 scatter(mod(use_grng_g_l,2*pi),mod(use_laval_g_l,2*pi),s=.5,color="DarkBlue")
 xticks(xlabp, xlabs, fontsize=18)
 yticks(ylabp, ylabs, fontsize=18)
-
-###################
-#Asses Discrepancy
-#####################
-grng_acrophases=float(mod(use_grng_g_l,2*pi))
-laval_acrophases=float(mod(use_laval_g_l,2*pi))
-
-errors=Circular_Error_List(grng_acrophases,laval_acrophases)
-hrerrors=(12/pi)*abs(errors)
-mean(hrerrors)
-median(hrerrors)
-sqrt(var(hrerrors))
-sort(hrerrors)[.75*length(hrerrors)]
-
-correlations=Circular_Correlations(grng_acrophases,laval_acrophases)
 #xlabel("GRNG Acrophase (radians)", fontsize=18)
 #ylabel("Laval Acrophase (radians)", fontsize=18)
 
@@ -231,31 +220,33 @@ correlations=Circular_Correlations(grng_acrophases,laval_acrophases)
 ############################################################
 close()
 subplot(1,2,1)
-plt.hist(estimated_phaselist_g_adj_final,normed=1,alpha=.5,color="DarkGreen")
-plt.xlabel("Phase of Sample Collection (GRNG)", fontsize=18)
-plt.ylabel("Probability", fontsize=18)
+plt[:hist](estimated_phaselist_g_adj_final,normed=1,alpha=.5,color="DarkGreen")
+xlabel("Phase of Sample Collection (GRNG)", fontsize=18)
+ylabel("Probability", fontsize=18)
 subplot(1,2,2)
-plt.hist(estimated_phaselist_l_adj_final,normed=1,alpha=.5,color="DarkBlue")
-plt.ylabel("Probability", fontsize=18)
-plt.xlabel("Phase of Sample Collection (Laval)", fontsize=18)
+plt[:hist](estimated_phaselist_l_adj_final,normed=1,alpha=.5,color="DarkBlue")
+ylabel("Probability", fontsize=18)
+xlabel("Phase of Sample Collection (Laval)", fontsize=18)
 ############################################################
 close()
-plt.hist(estimated_phaselist_l_adj_final,normed=1,alpha=.5,color="DarkBlue")
+plt[:hist](estimated_phaselist_l_adj_final,normed=1,alpha=.5,color="DarkBlue")
 xticks(xlabp, xlabs)
-plt.ylabel("Probability", fontsize=18)
-plt.xlabel("Phase of Sample Collection (Laval)", fontsize=18)
+ylabel("Probability", fontsize=18)
+xlabel("Phase of Sample Collection (Laval)", fontsize=18)
 ############################################################
 # Sample Historgrams - Laval - No annotations
 ############################################################
 close()
-plt.hist(estimated_phaselist_l_adj_final,normed=1,alpha=.5,color="DarkBlue")
+plt[:hist](estimated_phaselist_l_adj_final,normed=1,alpha=.5,color="DarkBlue")
 xticks(xlabp, xlabs)
 ############################################################
 # Sample Historgrams - All- No annotations
 ############################################################
 close()
-plt.hist([estimated_phaselist_l_adj_final,estimated_phaselist_g_adj_final],normed=1,alpha=.5,color="DarkBlue")
-
+plt[:hist](vcat(estimated_phaselist_l_adj_final,estimated_phaselist_g_adj_final),normed=1,alpha=.5,color="DarkBlue")
+xticks(xlabp, xlabs)
+ylabel("Probability", fontsize=18)
+xlabel("Phase of Sample Collection (Laval & GRNG)", fontsize=18)
 ###################################
 r_grng=Filter_Cosinor_Output(cosinor_grng,.05,.65,1.66)
 r_laval=Filter_Cosinor_Output(cosinor_laval,.05,.65,1.66)
@@ -269,8 +260,8 @@ common_g_l_r=intersect(r_grng[2:end,1],r_laval[2:end,1])
 clockgenes=["CLOCK","CRY2","CRY1","DBP","TEF","HLF","EFNB2","ADAM9","E4F1","ACE","NR1D1","NR1D2","RORA"]
 aclockrows=findin(alldata_symbols_g,clockgenes);
 clockrows=aclockrows
-clockrows=aclockrows[[[23,4,27,21,6,16,8,20,17]]]
-clockrows=aclockrows[[[23,4,27,8,20,17]]]
+clockrows=aclockrows[[23,4,27,21,6,16,8,20,17]]
+clockrows=aclockrows[[23,4,27,8,20,17]]
 clockdata_g=alldata_data_g[clockrows,:];
 clockdata_l=alldata_data_l[clockrows,:];
 
@@ -302,9 +293,9 @@ for n in 1:6
           ymax=minimum([ymean+3*std(clockdata_g[n,:]),maximum(clockdata_g[n,:])])
           ymin=maximum([0,ymean-3*std(clockdata_g[n,:])])
           
-          ymaxstar=int(100*div(ymax,100))
-          yminstar=int(100*div(ymin,100))
-          ymedstar=int((yminstar+ymaxstar)/2)
+          ymaxstar=Integer(100*div(ymax,100))
+          yminstar=Integer(100*div(ymin,100))
+          ymedstar=Integer((yminstar+ymaxstar)/2)
           
           ylabp=[yminstar,ymedstar,ymaxstar]
           ylabs=[yminstar,ymedstar,ymaxstar]
@@ -322,7 +313,7 @@ for n in 1:6
 
           PrbPhase,PrbAmp,PrbMean=cosinor_clock_g[n,[6,7,8]]
           sest=linspace(0,2*pi,100)
-          synth=PrbAmp*cos(sest-PrbPhase)+PrbMean
+          synth=PrbAmp*cos.(sest-PrbPhase)+PrbMean
           plot(sest,synth,"r-",lw=2)
         
 
@@ -337,9 +328,9 @@ for n in 1:6
           ymin=maximum([0,ymean-3*std(clockdata_l[n,:])])
           println(yminstar,"   ",ymedstar,"    ",ymaxstar)
 
-          ymaxstar=int(100*div(ymax,100))
-          yminstar=int(100*div(ymin,100))
-          ymedstar=int((yminstar+ymaxstar)/2)
+          ymaxstar=Integer(100*div(ymax,100))
+          yminstar=Integer(100*div(ymin,100))
+          ymedstar=Integer((yminstar+ymaxstar)/2)
           
           ylabp=[yminstar,ymedstar,ymaxstar]
           ylabs=[yminstar,ymedstar,ymaxstar]
@@ -355,7 +346,7 @@ for n in 1:6
 
           PrbPhase,PrbAmp,PrbMean=cosinor_clock_l[n,[6,7,8]]
           sest=linspace(0,2*pi,100)
-          synth=PrbAmp*cos(sest-PrbPhase)+PrbMean
+          synth=PrbAmp*cos.(sest-PrbPhase)+PrbMean
           plot(sest,synth,"r-",lw=2)
 
 end
@@ -387,9 +378,9 @@ for n in 1:5
           ymax=minimum([ymean+3*std(clockdata_g[n,:]),maximum(clockdata_g[n,:])])
           ymin=maximum([0,ymean-3*std(clockdata_g[n,:])])
           
-          ymaxstar=int(100*div(ymax,100))
-          yminstar=int(100*div(ymin,100))
-          ymedstar=int((yminstar+ymaxstar)/2)
+          ymaxstar=Integer(100*div(ymax,100))
+          yminstar=Integer(100*div(ymin,100))
+          ymedstar=Integer((yminstar+ymaxstar)/2)
           
           ylabp=[yminstar,ymedstar,ymaxstar]
           ylabs=[yminstar,ymedstar,ymaxstar]
@@ -407,7 +398,7 @@ for n in 1:5
 
           PrbPhase,PrbAmp,PrbMean=cosinor_clock_g[n,[6,7,8]]
           sest=linspace(0,2*pi,100)
-          synth=PrbAmp*cos(sest-PrbPhase)+PrbMean
+          synth=PrbAmp*cos.(sest-PrbPhase)+PrbMean
           plot(sest,synth,"r-",lw=2)
         
 
@@ -422,9 +413,9 @@ for n in 1:5
           ymin=maximum([0,ymean-3*std(clockdata_l[n,:])])
           println(yminstar,"   ",ymedstar,"    ",ymaxstar)
 
-          ymaxstar=int(100*div(ymax,100))
-          yminstar=int(100*div(ymin,100))
-          ymedstar=int((yminstar+ymaxstar)/2)
+          ymaxstar=Integer(100*div(ymax,100))
+          yminstar=Integer(100*div(ymin,100))
+          ymedstar=Integer((yminstar+ymaxstar)/2)
           
           ylabp=[yminstar,ymedstar,ymaxstar]
           ylabs=[yminstar,ymedstar,ymaxstar]
@@ -440,7 +431,7 @@ for n in 1:5
 
           PrbPhase,PrbAmp,PrbMean=cosinor_clock_l[n,[6,7,8]]
           sest=linspace(0,2*pi,100)
-          synth=PrbAmp*cos(sest-PrbPhase)+PrbMean
+          synth=PrbAmp*cos.(sest-PrbPhase)+PrbMean
           plot(sest,synth,"r-",lw=2)
 
 end
@@ -463,7 +454,7 @@ function refine_order(l_outs::Integer,l_norm_seed_data::Array{Float64,2},NET,epo
     global_metrics=[besterror, besterror/(total_sse-besterror), besterror/(onedlinear_sse-besterror)]
 
     estimated_phaselist=ExtractPhase(l_norm_seed_data,bestnet);
-    estimated_phaselist=mod(estimated_phaselist + 2*pi,2*pi)
+    estimated_phaselist=mod.(estimated_phaselist + 2*pi,2*pi)
     estimated_phaselist,bestnet,global_metrics
 end 
 ########################

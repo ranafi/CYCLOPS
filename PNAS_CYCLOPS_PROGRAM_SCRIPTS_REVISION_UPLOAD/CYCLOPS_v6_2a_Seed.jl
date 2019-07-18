@@ -1,18 +1,18 @@
-module CYCLOPS_2a_Seed
+module CYCLOPS_v6_2a_Seed
 export clean_data!
 export getseed
 export dispersion
 export dispersion!
 export getseed_mca
-export setdiff
+#export setdiff
 export getseed_homologuesymbol
 export getseed_homologueprobe
 export getseed_homologuesymbol_brain
 
 function clean_data!(data::Array{Float64,2},bluntpercent=0.99)
 	ngenes,nsamples=size(data)
-	nfloor=1+floor((1-bluntpercent)*nsamples)
-	nceiling=ceil(bluntpercent*nsamples)
+	nfloor=Int(1+floor((1-bluntpercent)*nsamples))
+	nceiling=Int(ceil(bluntpercent*nsamples))
 	for row=1:ngenes
 		sorted=sort(vec(data[row,:]))
 		vfloor=sorted[nfloor]
@@ -30,7 +30,7 @@ end
 function getseed(data::Array{Any,2},symbol_list,maxcv=.75,mincv=.07,minmean=500,blunt=.99)
 	data_symbols=data[2:end ,2]
 	data_data=data[2:end , 4:end];
-	data_data=float64(data_data)
+	data_data=Array{Float64}(data_data)
 	data_data=clean_data!(data_data,blunt)
 	ngenes,namples=size(data_data)
 
@@ -58,7 +58,7 @@ function getseed_mca(data::Array{Any,2},probe_list,maxcv=.75,mincv=.07,minmean=5
 	data_probes=data[2:end ,1];
 
 	data_data=data[2:end , 4:end];
-	data_data=float64(data_data)
+	data_data=Array{Float64}(data_data)
 	data_data=clean_data!(data_data,blunt)
 	ngenes,namples=size(data_data)
 
@@ -85,7 +85,7 @@ function getseed_homologuesymbol(data::Array{Any,2},symbol_list,maxcv=.75,mincv=
 	data_probes=data[2:end ,1];
 
 	data_data=data[2:end , 3:end];
-	data_data=float64(data_data)
+	data_data=Array{Float64}(data_data)
 	data_data=clean_data!(data_data,blunt)
 	ngenes,namples=size(data_data)
 
@@ -113,7 +113,7 @@ function getseed_homologueprobe(data::Array{Any,2},probe_list,maxcv=.75,mincv=.0
 	data_probes=data[2:end ,1];
 
 	data_data=data[2:end , 3:end];
-	data_data=float64(data_data)
+	data_data=Array{Float64}(data_data)
 	data_data=clean_data!(data_data,blunt)
 	ngenes,namples=size(data_data)
 
@@ -160,16 +160,16 @@ function dispersion(data::Array{Float64,2})
 end
 
 ##############################################
-function setdiff(x,y)
-       	z= [x[1]]
-       	for element in x
-       		if !in(element,y) 
-       			push!(z,element)
-       		end
-       	end
-    z=z[2:length(z)]
-    z
-end	
+#function setdiff(x,y)
+#       	z= [x[1]]
+#       	for element in x
+#       		if !in(element,y) 
+#       			push!(z,element)
+#       		end
+#       	end
+#    z=z[2:length(z)]
+#    z
+#end	
 	
 ###############
 
@@ -180,7 +180,7 @@ function getseed_homologuesymbol_brain(data::Array{Any,2},symbol_list,maxcv=.75,
 	data_probes=data[4:end ,1];
 
 	data_data=data[4:end , 4:end];
-	data_data=float64(data_data)
+	data_data=Array{Float64}(data_data)
 	data_data=clean_data!(data_data,blunt)
 	ngenes,namples=size(data_data)
 

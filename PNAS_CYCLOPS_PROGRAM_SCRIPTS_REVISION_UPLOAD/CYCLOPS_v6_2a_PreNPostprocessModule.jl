@@ -1,4 +1,4 @@
-module CYCLOPS_2a_PreNPostprocessModule
+module CYCLOPS_v6_2a_PreNPostprocessModule
 #export Size_Transform_Seed_Data
 
 export GetEigenGenes
@@ -83,7 +83,7 @@ end
 ##########################################################
 ##########################################################
 #####################################################################################################################
-function Corrected_Cosinor_Statistics_Faster(expression::Array{Float64,2},o_PREDICTED_PHASELIST::Array{Float64,1},n_shifts=20)
+function Corrected_Cosinor_Statistics_Faster(expression::Array{Float64,1},o_PREDICTED_PHASELIST::Array{Float64,1},n_shifts=20)
     
     len=size(o_PREDICTED_PHASELIST)[1]
     shift_list=linspace(2*pi/n_shifts,2*pi,n_shifts)
@@ -91,7 +91,7 @@ function Corrected_Cosinor_Statistics_Faster(expression::Array{Float64,2},o_PRED
     min_error=var(expression)*10E20
     best_shift="error"
     for shift in shift_list
-        l_PREDICTED_PHASELIST       =mod((o_PREDICTED_PHASELIST + shift),(2*pi))
+        l_PREDICTED_PHASELIST       =mod.((o_PREDICTED_PHASELIST + shift),(2*pi))
         
         XLINEAR =reshape(l_PREDICTED_PHASELIST,len,1);
         
@@ -99,16 +99,16 @@ function Corrected_Cosinor_Statistics_Faster(expression::Array{Float64,2},o_PRED
         m_linear, b_linear  = mod_linear[1:end-1], mod_linear[end];
         predict_linear      =XLINEAR*m_linear + b_linear;
 
-        sse_linear          =sum(abs2(expression-predict_linear));
+        sse_linear          =sum(abs2.(expression-predict_linear));
         if sse_linear < min_error
             min_error=sse_linear
             best_shift=shift
         end    
     end
      
-    l_PREDICTED_PHASELIST=mod((o_PREDICTED_PHASELIST + best_shift),(2*pi))
-    SIN_l_PREDICTED_PHASELIST   =sin(l_PREDICTED_PHASELIST);
-    COS_l_PREDICTED_PHASELIST   =cos(l_PREDICTED_PHASELIST);
+    l_PREDICTED_PHASELIST=mod.((o_PREDICTED_PHASELIST + best_shift),(2*pi))
+    SIN_l_PREDICTED_PHASELIST   =sin.(l_PREDICTED_PHASELIST);
+    COS_l_PREDICTED_PHASELIST   =cos.(l_PREDICTED_PHASELIST);
 
     XLINEAR =reshape(l_PREDICTED_PHASELIST,len,1);
     XFULL   =hcat(l_PREDICTED_PHASELIST,SIN_l_PREDICTED_PHASELIST,COS_l_PREDICTED_PHASELIST);
@@ -122,8 +122,8 @@ function Corrected_Cosinor_Statistics_Faster(expression::Array{Float64,2},o_PRED
     predict_linear      =XLINEAR*m_linear + b_linear;
     predict_full        =XFULL*m_full + b_full;
 
-    sse_linear          =sum(abs2(expression-predict_linear));
-    sse_full            =sum(abs2(expression-predict_full));
+    sse_linear          =sum(abs2.(expression-predict_linear));
+    sse_full            =sum(abs2.(expression-predict_full));
 
     f_metric            =((sse_linear-sse_full)/2)/((sse_full)/(len-5)); #p2=4+1 (+1 =shift) ,p1=2+1  (+1 =shift) ,n=len
     pval= 1-cdf(FDist(2,len-5),f_metric) #Note - null hypothesis this satisifes F distribution, with (p2−p1, n−p2) degrees of freedom. 
@@ -132,8 +132,8 @@ function Corrected_Cosinor_Statistics_Faster(expression::Array{Float64,2},o_PRED
     ###################
     #Get Phase,Amp,Avg
     ####################
-    SIN_o_PREDICTED_PHASELIST   =sin(o_PREDICTED_PHASELIST);
-    COS_o_PREDICTED_PHASELIST   =cos(o_PREDICTED_PHASELIST);
+    SIN_o_PREDICTED_PHASELIST   =sin.(o_PREDICTED_PHASELIST);
+    COS_o_PREDICTED_PHASELIST   =cos.(o_PREDICTED_PHASELIST);
     XCOSINOR                    =hcat(SIN_o_PREDICTED_PHASELIST,COS_o_PREDICTED_PHASELIST);
     mod_cosinor                 =llsq(XCOSINOR,expression);
 
@@ -141,9 +141,9 @@ function Corrected_Cosinor_Statistics_Faster(expression::Array{Float64,2},o_PRED
     
     predict_cosinor             = XCOSINOR*m_cosinor + b_cosinor;
 
-    sse_cosinor                 =sum(abs2(expression-predict_cosinor));
+    sse_cosinor                 =sum(abs2.(expression-predict_cosinor));
     mean_expression             =mean(expression);
-    sse_base                    =sum(abs2(expression-mean_expression));
+    sse_base                    =sum(abs2.(expression-mean_expression));
 
     r2                          =1-(sse_cosinor/sse_base)
 
@@ -168,7 +168,7 @@ function MultiCore_Cosinor_Statistics(data::Array{Float64,2},PREDICTED_PHASELIST
     PrbR2=zeros(ngenes);
 
     for row=1:ngenes
-        PrbPval[row],PrbPhase[row],PrbAmp[row],PrbFitMean[row],PrbMean[row],PrbR2[row]=Corrected_Cosinor_Statistics_Faster(data[row,:]',PREDICTED_PHASELIST,n_shifts)
+        PrbPval[row],PrbPhase[row],PrbAmp[row],PrbFitMean[row],PrbMean[row],PrbR2[row]=Corrected_Cosinor_Statistics_Faster(data[row,:],PREDICTED_PHASELIST,n_shifts)
     end
     PrbPval,PrbPhase,PrbAmp,PrbFitMean,PrbMean,PrbR2
 end
@@ -179,9 +179,9 @@ end
 function best_shift_cos2(acrophaselist1,acrophaselist2,samplephase1,conversion_flag)
 
     if conversion_flag=="hours"
-        llist2=mod(acrophaselist2,24)*(pi/12)
+        llist2=mod.(acrophaselist2,24)*(pi/12)
     elseif conversion_flag=="radians"
-        llist2=mod(acrophaselist2,2*pi)
+        llist2=mod.(acrophaselist2,2*pi)
     else
         println("FLAG ERROR")
     end
@@ -191,22 +191,22 @@ function best_shift_cos2(acrophaselist1,acrophaselist2,samplephase1,conversion_f
     bestsamplephase1=samplephase1
 
     for a in linspace(-pi,pi,192)
-        llist1=mod(acrophaselist1+a,2*pi)
-        adist=mean(1 - cos(float(llist1-llist2)))
+        llist1=mod.(acrophaselist1+a,2*pi)
+        adist=mean(1 - cos.(float(llist1-llist2)))
         if bestdist>adist
             bestdist=adist
             bestacrophaselist1=llist1
-            bestsamplephase1=mod(samplephase1+a,2*pi)
+            bestsamplephase1=mod.(samplephase1+a,2*pi)
         end
       end
 
     for a in linspace(-pi,pi,192)
-        llist1=mod(-(acrophaselist1+a),2*pi)
-        adist=mean(1 - cos(float(llist1-llist2)))
+        llist1=mod.(-(acrophaselist1+a),2*pi)
+        adist=mean(1 - cos.(float(llist1-llist2)))
         if bestdist>adist
             bestdist=adist
             bestacrophaselist1=llist1
-            bestsamplephase1=mod(-(samplephase1+a),2*pi)
+            bestsamplephase1=mod.(-(samplephase1+a),2*pi)
 
         end
         
@@ -220,9 +220,9 @@ function best_shift_cos(list1,list2,conversion_flag)
     nlist=length(list1)
 
     if conversion_flag=="hours"
-        llist2=mod(list2,24)*(pi/12)
+        llist2=mod.(list2,24)*(pi/12)
     elseif conversion_flag=="radians"
-        llist2=mod(list2,2*pi)
+        llist2=mod.(list2,2*pi)
     else
         println("FLAG ERROR")
     end
@@ -232,7 +232,7 @@ function best_shift_cos(list1,list2,conversion_flag)
     n=0;
     for a in linspace(-pi,pi,192)
         n=n+1
-        llist1=mod(list1+a,2*pi)
+        llist1=mod.(list1+a,2*pi)
         runningscore=0
         for i in 1:nlist
             cosd=(1-cos(llist1[i]-llist2[i]))/2
@@ -247,7 +247,7 @@ function best_shift_cos(list1,list2,conversion_flag)
 
     for a in linspace(-pi,pi,192)
         n=n+1
-        llist1=mod(-(list1+a),2*pi)
+        llist1=mod.(-(list1+a),2*pi)
         runningscore=0
         for i in 1:nlist
             cosd=(1-cos(llist1[i]-llist2[i]))/2
@@ -268,10 +268,10 @@ end
 function Compile_MultiCore_Cosinor_Statistics(annotated_data::Array{Any,2},PREDICTED_PHASELIST::Array{Float64,1},NumericStartCol=4,n_shifts=20) 
 
 alldata_annot=annotated_data[1:end ,1:(NumericStartCol-1)];
-alldata_data=float(annotated_data[2:end , NumericStartCol:end]);
+alldata_data=Array{Float64}(annotated_data[2:end , NumericStartCol:end]);
 
 ngenes=size(alldata_data)[1]
-rowbin=int(floor(ngenes/5));
+rowbin=Int(floor(ngenes/5));
 tic()
 estimated_phaselist=vec(PREDICTED_PHASELIST)
 c1=@spawn MultiCore_Cosinor_Statistics(alldata_data[(1:(1*rowbin)),:],estimated_phaselist) ;
@@ -298,7 +298,9 @@ PrbPtr= (PrbAmp + PrbFitMean) ./  (PrbFitMean - PrbAmp)
 PrbBon=Bonferroni_Adjust(PrbPval);
 
 cosinor_output=hcat(PrbPval,PrbBon,PrbPhase,PrbAmp,PrbFitMean,PrbMean,PrbRsq,PrbPtr)
-headers=["pval","bon_pval","phase","amp","fitmean","mean","rsq","ptr"]'
+headers=["pval","bon_pval","phase","amp","fitmean","mean","rsq","ptr"]
+headers=reshape(headers,1,length(headers))
+
 cosinor_output=vcat(headers,cosinor_output)
 cosinor_output=hcat(alldata_annot,cosinor_output)
 cosinor_output

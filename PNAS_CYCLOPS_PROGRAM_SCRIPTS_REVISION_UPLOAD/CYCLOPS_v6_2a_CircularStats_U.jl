@@ -1,4 +1,4 @@
-module CYCLOPS_2a_CircularStats_U
+module CYCLOPS_v6_2a_CircularStats_U
 
 export Circular_Mean
 export Fischer_Circular_CorrelationMeasures
@@ -11,8 +11,8 @@ using StatsBase
 
 ############################################################
 function Circular_Mean(phases::Array{Float64,1})
-  sinterm=sum(sin(phases))
-  costerm=sum(cos(phases))
+  sinterm=sum(sin.(phases))
+  costerm=sum(cos.(phases))
   atan2(sinterm,costerm)
 end 
 
@@ -24,8 +24,8 @@ function Fischer_Circular_Correlations(rphases,sphases)
 
 	num=n1
 
-	rphases=mod(rphases+2*pi,2*pi)
-	sphases=mod(sphases+2*pi,2*pi)
+	rphases=mod.(rphases+2*pi,2*pi)
+	sphases=mod.(sphases+2*pi,2*pi)
 
 	numtot=0.
 	d1tot=0.
@@ -49,12 +49,12 @@ function Jammalamadka_Circular_Correlations(rphases,sphases)
 	d1tot=0.
 	d2tot=0.
 	
-	rbar=mod(2*pi+Circular_Mean(rphases),2*pi)
-	sbar=mod(2*pi+Circular_Mean(sphases),2*pi)
+	rbar=mod.(2*pi+Circular_Mean(rphases),2*pi)
+	sbar=mod.(2*pi+Circular_Mean(sphases),2*pi)
 
-	numtot=sum(sin(rphases-rbar) .* sin(sphases-sbar))
-	d1tot=sqrt(sum( sin(rphases-rbar) .^ 2))
-	d2tot=sqrt(sum( sin(sphases-sbar) .^ 2))
+	numtot=sum(sin.(rphases-rbar) .* sin.(sphases-sbar))
+	d1tot=sqrt(sum( sin.(rphases-rbar) .^ 2))
+	d2tot=sqrt(sum( sin.(sphases-sbar) .^ 2))
 	Jammalamadka=numtot/(d1tot*d2tot)
 	Jammalamadka
 end
@@ -62,7 +62,7 @@ end
 ############################################################
 function Circular_Rank_Phases(rphases)
 	number=length(rphases)
-	rphases=mod(rphases+2*pi,2*pi)
+	rphases=mod.(rphases+2*pi,2*pi)
 	rranks=tiedrank(rphases)
 	rrankphases=rranks*2*pi/number
 	rrankphases
@@ -74,13 +74,13 @@ function Jammalamadka_Rank_Circular_Correlations(rphases,sphases)
 	rphases=Circular_Rank_Phases(rphases)
 	sphases=Circular_Rank_Phases(sphases)
 
-	r_minus_s_bar=mod(atan2(sum(sin(rphases-sphases)),sum(cos(rphases-sphases))),2*pi)
-	r_plus_s_bar=mod(atan2(sum(sin(rphases+sphases)),sum(cos(rphases+sphases))),2*pi)
+	r_minus_s_bar=mod(atan2(sum(sin.(rphases-sphases)),sum(cos.(rphases-sphases))),2*pi)
+	r_plus_s_bar=mod(atan2(sum(sin.(rphases+sphases)),sum(cos.(rphases+sphases))),2*pi)
 
 	Ntot=length(rphases)
 
-	term1=cos(rphases-sphases-r_minus_s_bar)
-	term2=cos(rphases+sphases-r_plus_s_bar)
+	term1=cos.(rphases-sphases-r_minus_s_bar)
+	term2=cos.(rphases+sphases-r_plus_s_bar)
 	
 	Jammalamadka=1/Ntot*(sum(term1))-1/Ntot*(sum(term2))
 	Jammalamadka
@@ -100,19 +100,19 @@ function Jammalamadka_Uniform_Circular_Correlations(rphases,sphases)
 # It is required beacuse the circular average is not well defined with circular uniform data
 # This measure should only be used when 1 or both of the data sets being compared are uniform
 
-	rphases=mod(rphases,2*pi)
-	sphases=mod(sphases,2*pi)
+	rphases=mod.(rphases,2*pi)
+	sphases=mod.(sphases,2*pi)
 
-	r_minus_s_bar=mod(atan2(sum(sin(rphases-sphases)),sum(cos(rphases-sphases))),2*pi)
-	r_plus_s_bar=mod(atan2(sum(sin(rphases+sphases)),sum(cos(rphases+sphases))),2*pi)
+	r_minus_s_bar=mod(atan2(sum(sin.(rphases-sphases)),sum(cos.(rphases-sphases))),2*pi)
+	r_plus_s_bar=mod(atan2(sum(sin.(rphases+sphases)),sum(cos.(rphases+sphases))),2*pi)
 
 	bars=FindComponentAngles(r_plus_s_bar,r_minus_s_bar)
 	rbar=bars[1]
 	sbar=bars[2]
 
-	numtot=sum(sin(rphases-rbar) .* sin(sphases-sbar))
-	d1tot=sqrt(sum( sin(rphases-rbar) .^ 2))
-	d2tot=sqrt(sum( sin(sphases-sbar) .^ 2))
+	numtot=sum(sin.(rphases-rbar) .* sin.(sphases-sbar))
+	d1tot=sqrt(sum( sin.(rphases-rbar) .^ 2))
+	d2tot=sqrt(sum( sin.(sphases-sbar) .^ 2))
 
 	Jammalamadka=numtot/(d1tot*d2tot)
 	Jammalamadka
@@ -156,11 +156,11 @@ function Circular_Error(truth,estimate)
 	diff1=mod((truth-estimate),2*pi)
 	diff2=diff1-(2*pi)
 
-	if (abs(diff1)<=abs(diff2)) then
+	if (abs(diff1)<=abs(diff2)) 
 		diff=diff1
 	end
 	
-	if (abs(diff2)<abs(diff1)) then
+	if (abs(diff2)<abs(diff1))
 		diff=diff2
 	end
 		
